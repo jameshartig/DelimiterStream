@@ -6,7 +6,18 @@ through the stream, a "data" event will be emitted whenever the delimiter is see
 will contain the chunk of data after the last delimiter and before the one just seen. The
 chunk will **NOT include the delimiter**.
 
-*Will be packaged for NPM soon.*
+### Install
+Doesn't require any dependencies. You can either just install via npm:
+
+```
+npm install delimiterstream
+```
+
+or
+
+```
+var DelimiterStream = require("./DelimiterStream/DelimiterStream.js");
+```
 
 Methods
 -------
