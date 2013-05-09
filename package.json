@@ -1,0 +1,25 @@
+{
+  "name": "DelimiterStream",
+  "version": "0.1.0",
+  "description": "Get delimiter-separated chunks of data from a Readable Stream.",
+  "main": "DelimiterStream.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "nodeunit tests"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/fastest963/DelimiterStream.git"
+  },
+  "keywords": [
+    "stream",
+    "delimiter",
+    "readable",
+    "streams2",
+    "DelimiterStream"
+  ],
+  "author": "James Hartig <fastest963@gmail.com>",
+  "license": "BSD"
+}
