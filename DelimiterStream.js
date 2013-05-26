@@ -103,7 +103,7 @@ function readBinaryData() {
 /**
  * Encoding should be what you set on the readableStream.
  */
-function DelimiterStream(readableStream, delimiter, encoding, oldStream) {
+function DelimiterStream(readableStream, delimiter, encoding, oldStream, initialBuffer) {
     events.EventEmitter.apply(this);
 
     this.delimiter = delimiter;
@@ -114,7 +114,7 @@ function DelimiterStream(readableStream, delimiter, encoding, oldStream) {
     this.encoding = encoding;
     this.emitEvents = false;
     this.matches = [];
-    this.buffer = [];
+    this.buffer = initialBuffer || [];
 
     /**
      * todo: there has to be a better way than storing the callbacks
@@ -176,10 +176,13 @@ DelimiterStream.prototype.destroy = function() {
 };
 
 /**
- * Helper function to get the underlying stream
+ * Helper functions
  */
 DelimiterStream.prototype.getStream = function() {
     return this.readableStream;
+};
+DelimiterStream.prototype.getBuffer = function() {
+    return this.buffer.slice(0);
 };
 
 module.exports = DelimiterStream;
