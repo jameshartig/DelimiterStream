@@ -199,23 +199,6 @@ exports.removedListeners = function(test) {
     test.done();
 };
 
-exports.removedListeners = function(test) {
-    f = new FakeReader();
-    s = new DelimiterStream(f, "\n", "utf8");
-    s.on('data', function(data) {});
-    s.resume();
-
-    test.equal(events.EventEmitter.listenerCount(f, 'readable'), 1);
-    test.equal(events.EventEmitter.listenerCount(f, 'close'), 1);
-
-    s.destroy();
-
-    test.equal(events.EventEmitter.listenerCount(f, 'readable'), 0);
-    test.equal(events.EventEmitter.listenerCount(f, 'close'), 0);
-    test.done();
-};
-
-
 exports.oneMatchThenClose = function(test) {
     f = new FakeReader('utf8');
     f.write("\n", 275); //"\n"
