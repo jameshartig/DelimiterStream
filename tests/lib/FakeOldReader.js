@@ -1,7 +1,7 @@
 var util = require('util'),
     events = require('events');
 
-function FakeReader(enc, n, i) {
+function FakeOldReader(enc, n, i) {
     events.EventEmitter.apply(this);
 
     n = n || 1000;
@@ -12,9 +12,9 @@ function FakeReader(enc, n, i) {
     this.interval = i || 250; //interval which causes a break in the read loop
     this.encoding = enc;
 }
-util.inherits(FakeReader, events.EventEmitter);
+util.inherits(FakeOldReader, events.EventEmitter);
 
-FakeReader.prototype.write = function() {
+FakeOldReader.prototype.write = function() {
     if (this.encoding) {
         this.buffer.write.apply(this.buffer, Array.prototype.slice.call(arguments, 0));
     } else {
@@ -22,9 +22,9 @@ FakeReader.prototype.write = function() {
     }
 };
 
-FakeReader.prototype.read = function(n) {
+FakeOldReader.prototype.sendData = function(n) {
     if (this.position >= this.max) {
-        this.emit('done', false); //not old style
+        this.emit('done', true); //yes this is old
         return null;
     }
 
@@ -41,19 +41,21 @@ FakeReader.prototype.read = function(n) {
     } else {
         resp = this.buffer.slice(start, this.position);
     }
+    this.emit('data', resp);
+
     setTimeout(function() {
-        this.emit('readable');
+        this.sendData();
     }.bind(this), 20);
-    return resp;
 };
-FakeReader.prototype.begin = function() {
+FakeOldReader.prototype.begin = function() {
     process.nextTick(function() {
-        this.emit('readable');
+        this.sendData();
     }.bind(this));
 };
-FakeReader.prototype.close = function() {
+FakeOldReader.prototype.close = function() {
     process.nextTick(function() {
         this.emit('close');
     }.bind(this));
 };
-module.exports = FakeReader;
+FakeOldReader.prototype.resume = function() {};
+module.exports = FakeOldReader;

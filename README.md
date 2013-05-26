@@ -24,12 +24,13 @@ Methods
 
 ### Constructor
 ```
-function (readableStream, delimiter, encoding)
+function (readableStream, delimiter, encoding, oldStream)
 ```
 
 * *readableStream* is a Readable Stream that emits a "readable" event and has a read function.
 * *delimiter* is the character or byte that splits the data and triggers a "data" event.
 * *encoding* is the encoding of the stream. Defaults to "binary".
+* *oldStream* should be set to true if you're passing a stream that emits "data" events instead of the new "readable" events.
 
 Once you've added your "data" listener, call resume().
 

@@ -13,80 +13,97 @@ function emitEvents(stream) {
 }
 
 /**
- * Read data from the stream and make matches based on delimiter
+ * Handle data from a string stream
+ */
+function handleStringData(stream, data) {
+    var i = data.length,
+        origLastMatch; //data after the first occurrence of delimiter
+    while (i--) {
+        if (data[i] === stream.delimiter) {
+            origLastMatch = i;
+            break;
+        }
+    }
+    if (i === -1) {
+        stream.buffer.push(data);
+        return;
+    }
+    var lastMatch = i;
+    while (i--) {
+        if (data[i] === stream.delimiter) {
+            stream.matches.push(data.substring(i + 1, lastMatch));
+            lastMatch = i;
+        }
+    }
+    //now that the loop is done, need to add on bufferString to the beginning of data
+    stream.buffer.push(data.substring(0, lastMatch));
+    stream.matches.push(stream.buffer.join(""));
+    stream.buffer = [data.substring(origLastMatch + 1)];
+
+    if (stream.emitEvents) {
+        emitEvents(stream);
+    }
+}
+
+/**
+ * Handle data from a binary stream
+ */
+function handleBinaryData(stream, data) {
+    var i = data.length,
+        origLastMatch; //data after the first occurrence of delimiter
+    while (i--) {
+        if (data[i] === stream.delimiter) {
+            origLastMatch = i;
+            break;
+        }
+    }
+    if (i === -1) {
+        stream.buffer.push(data);
+        return;
+    }
+    var lastMatch = i;
+    while (i--) {
+        if (data[i] === stream.delimiter) {
+            stream.matches.push(data.slice(i + 1, lastMatch));
+            lastMatch = i;
+        }
+    }
+    //now that the loop is done, need to add on bufferString to the beginning of data
+    stream.buffer.push(data.slice(0, lastMatch));
+    stream.matches.push(Buffer.concat(stream.buffer));
+    stream.buffer = [data.slice(origLastMatch + 1)];
+
+    if (stream.emitEvents) {
+        emitEvents(stream);
+    }
+}
+
+/**
+ * Read data from a string stream
  */
 function readStringData() {
     var data = this.readableStream.read();
     if (!data) {
         return;
     }
-    var i = data.length,
-        origLastMatch; //data after the first occurrence of delimiter
-    while (i--) {
-        if (data[i] === this.delimiter) {
-            origLastMatch = i;
-            break;
-        }
-    }
-    if (i === -1) {
-        this.buffer.push(data);
-        return;
-    }
-    var lastMatch = i;
-    while (i--) {
-        if (data[i] === this.delimiter) {
-            this.matches.push(data.substring(i + 1, lastMatch));
-            lastMatch = i;
-        }
-    }
-    //now that the loop is done, need to add on bufferString to the beginning of data
-    this.buffer.push(data.substring(0, lastMatch));
-    this.matches.push(this.buffer.join(""));
-    this.buffer = [data.substring(origLastMatch + 1)];
-
-    if (this.emitEvents) {
-        emitEvents(this);
-    }
+    handleStringData(this, data);
 }
 
+/**
+ * Read data from a binary stream
+ */
 function readBinaryData() {
     var data = this.readableStream.read();
     if (!data) {
         return;
     }
-    var i = data.length,
-        origLastMatch; //data after the first occurrence of delimiter
-    while (i--) {
-        if (data[i] === this.delimiter) {
-            origLastMatch = i;
-            break;
-        }
-    }
-    if (i === -1) {
-        this.buffer.push(data);
-        return;
-    }
-    var lastMatch = i;
-    while (i--) {
-        if (data[i] === this.delimiter) {
-            this.matches.push(data.slice(i + 1, lastMatch));
-            lastMatch = i;
-        }
-    }
-    //now that the loop is done, need to add on bufferString to the beginning of data
-    this.buffer.push(data.slice(0, lastMatch));
-    this.matches.push(Buffer.concat(this.buffer));
-    this.buffer = [data.slice(origLastMatch + 1)];
-
-    if (this.emitEvents) {
-        emitEvents(this);
-    }
+    handleBinaryData(this, data);
 }
 
 /**
  * Encoding should be what you set on the readableStream.
  */
-function DelimiterStream(readableStream, delimiter, encoding) {
+function DelimiterStream(readableStream, delimiter, encoding, oldStream) {
     events.EventEmitter.apply(this);
 
     this.delimiter = delimiter;
@@ -98,19 +115,30 @@ function DelimiterStream(readableStream, delimiter, encoding) {
     this.emitEvents = false;
     this.matches = [];
     this.buffer = [];
+
     /**
      * todo: there has to be a better way than storing the callbacks
      * (without using arguments.callee.caller)
      */
-    if (encoding === "binary") {
-        this.listenCallback = readBinaryData.bind(this);
-        readableStream.on('readable', this.listenCallback);
-    } else {
-        this.listenCallback = readStringData.bind(this);
-        readableStream.on('readable', this.listenCallback);
-    }
     this.destroyCallback = this.destroy.bind(this);
     readableStream.on('close', this.destroyCallback);
+
+    if (oldStream) {
+        if (encoding === "binary") {
+            this.listenCallback = handleBinaryData.bind(this, this);
+        } else {
+            this.listenCallback = handleStringData.bind(this, this);
+        }
+        readableStream.on('data', this.listenCallback);
+        readableStream.resume();
+    } else {
+        if (encoding === "binary") {
+            this.listenCallback = readBinaryData.bind(this);
+        } else {
+            this.listenCallback = readStringData.bind(this);
+        }
+        readableStream.on('readable', this.listenCallback);
+    }
 }
 
 util.inherits(DelimiterStream, events.EventEmitter);
@@ -140,10 +168,18 @@ DelimiterStream.prototype.destroy = function() {
     }
     this.readableStream.removeListener('close', this.destroyCallback);
     this.readableStream.removeListener('readable', this.listenCallback);
+    this.readableStream.removeListener('data', this.listenCallback);
     this.buffer = [];
     this.emitEvents = false;
     this.removeAllListeners();
     this.readableStream = null;
+};
+
+/**
+ * Helper function to get the underlying stream
+ */
+DelimiterStream.prototype.getStream = function() {
+    return this.readableStream;
 };
 
 module.exports = DelimiterStream;
