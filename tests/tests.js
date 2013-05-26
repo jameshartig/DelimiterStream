@@ -1,4 +1,5 @@
 var assert = require("assert"),
+    events = require('events'),
     FakeReader = require('./lib/FakeReader.js'),
     DelimiterStream = require("../DelimiterStream.js"),
     f, s;
@@ -179,5 +180,67 @@ exports.stringTenMatches = function(test) {
         dataCount--;
     });
     s.resume();
+    f.begin();
+};
+
+exports.removedListeners = function(test) {
+    f = new FakeReader();
+    s = new DelimiterStream(f, "\n", "utf8");
+    s.on('data', function(data) {});
+    s.resume();
+
+    test.equal(events.EventEmitter.listenerCount(f, 'readable'), 1);
+    test.equal(events.EventEmitter.listenerCount(f, 'close'), 1);
+
+    s.destroy();
+
+    test.equal(events.EventEmitter.listenerCount(f, 'readable'), 0);
+    test.equal(events.EventEmitter.listenerCount(f, 'close'), 0);
+    test.done();
+};
+
+exports.removedListeners = function(test) {
+    f = new FakeReader();
+    s = new DelimiterStream(f, "\n", "utf8");
+    s.on('data', function(data) {});
+    s.resume();
+
+    test.equal(events.EventEmitter.listenerCount(f, 'readable'), 1);
+    test.equal(events.EventEmitter.listenerCount(f, 'close'), 1);
+
+    s.destroy();
+
+    test.equal(events.EventEmitter.listenerCount(f, 'readable'), 0);
+    test.equal(events.EventEmitter.listenerCount(f, 'close'), 0);
+    test.done();
+};
+
+
+exports.oneMatchThenClose = function(test) {
+    f = new FakeReader('utf8');
+    f.write("\n", 275); //"\n"
+    var gotData = false;
+    f.on('done', function() {
+        test.ok(gotData);
+
+        //"close" the reader on nextTick
+        f.close();
+        process.nextTick(function() {
+            test.equal(events.EventEmitter.listenerCount(f, 'readable'), 0);
+            test.equal(events.EventEmitter.listenerCount(f, 'close'), 0);
+            test.done();
+        });
+    });
+
+    s = new DelimiterStream(f, "\n", "utf8");
+    s.on('data', function(data) {
+        test.equal(data.length, 275);
+        gotData = true;
+    });
+    s.resume();
+
+    test.equal(events.EventEmitter.listenerCount(f, 'readable'), 1);
+    test.equal(events.EventEmitter.listenerCount(f, 'close'), 1);
+
     f.begin();
 };

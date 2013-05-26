@@ -41,6 +41,15 @@ function ()
 Starts emitting "data" events with chunks based on the delimiter. Any pending chunks will
 cause "data" events to be emitted immediately.
 
+###destroy
+```
+function ()
+```
+
+Removes any listeners we had on the underlying stream. Also removes any listeners you've added
+to this DelimiterStream. Call this when you're done with a stream and want to have it cleaned up.
+Will be automatically called when the underlying stream emits "close".
+
 Example
 -------
 See example.js. Prints out data it received before an enter press (newline).

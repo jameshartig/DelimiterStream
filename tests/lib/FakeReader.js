@@ -51,4 +51,9 @@ FakeReader.prototype.begin = function() {
         this.emit('readable');
     }.bind(this));
 };
+FakeReader.prototype.close = function() {
+    process.nextTick(function() {
+        this.emit('close');
+    }.bind(this));
+};
 module.exports = FakeReader;

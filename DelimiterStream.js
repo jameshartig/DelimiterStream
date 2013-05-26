@@ -98,11 +98,19 @@ function DelimiterStream(readableStream, delimiter, encoding) {
     this.emitEvents = false;
     this.matches = [];
     this.buffer = [];
+    /**
+     * todo: there has to be a better way than storing the callbacks
+     * (without using arguments.callee.caller)
+     */
     if (encoding === "binary") {
-        readableStream.on('readable', readBinaryData.bind(this));
+        this.listenCallback = readBinaryData.bind(this);
+        readableStream.on('readable', this.listenCallback);
     } else {
-        readableStream.on('readable', readStringData.bind(this));
+        this.listenCallback = readStringData.bind(this);
+        readableStream.on('readable', this.listenCallback);
     }
+    this.destroyCallback = this.destroy.bind(this);
+    readableStream.on('close', this.destroyCallback);
 }
 
 util.inherits(DelimiterStream, events.EventEmitter);
@@ -119,6 +127,23 @@ DelimiterStream.prototype.resume = function() {
 
 DelimiterStream.prototype.pause = function() {
     this.emitEvents = false;
+};
+
+/**
+ * When you're finished with a stream, call destroy to remove
+ * any listeners. Note: this WILL remove any listeners you have
+ * added to "data".
+ */
+DelimiterStream.prototype.destroy = function() {
+    if (!this.readableStream) {
+        return;
+    }
+    this.readableStream.removeListener('close', this.destroyCallback);
+    this.readableStream.removeListener('readable', this.listenCallback);
+    this.buffer = [];
+    this.emitEvents = false;
+    this.removeAllListeners();
+    this.readableStream = null;
 };
 
 module.exports = DelimiterStream;
