@@ -98,6 +98,7 @@ function DelimiterStream(readableStream, delimiter, encoding, oldStream, initial
     this.emitEvents = false;
     this.matches = [];
     this.buffer = initialBuffer || [];
+    this.destroyed = false;
 
     this._closeCallback = this.onStreamClose.bind(this);
     readableStream.on('close', this._closeCallback);
@@ -203,6 +204,7 @@ DelimiterStream.prototype.destroy = function() {
     if (typeof this.readableStream.destroy === 'function') {
         this.readableStream.destroy.apply(this.readableStream, arguments);
     }
+    this.destroyed = true;
     this.readableStream = null;
     return this;
 };
