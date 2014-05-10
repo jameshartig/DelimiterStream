@@ -15,9 +15,10 @@ function emitEvents(stream) {
 /**
  * Handle data from a string stream
  */
-function handleStringData(stream, data) {
+function handleData(stream, asString, data) {
     var i = data.length,
-        origLastMatch; //data after the first occurrence of delimiter
+        origLastMatch, //data after the first occurrence of delimiter
+        sliceFuncName = asString ? 'substring': 'slice';
     while (i--) {
         if (data[i] === stream.delimiter) {
             origLastMatch = i;
@@ -31,52 +32,24 @@ function handleStringData(stream, data) {
     var lastMatch = i;
     while (i--) {
         if (data[i] === stream.delimiter) {
-            stream.matches.push(data.substring(i + 1, lastMatch));
+            stream.matches.push(data[sliceFuncName](i + 1, lastMatch));
             lastMatch = i;
         }
     }
     //now that the loop is done, need to add on bufferString to the beginning of data
-    stream.buffer.push(data.substring(0, lastMatch));
-    stream.matches.push(stream.buffer.join(""));
-    stream.buffer = [data.substring(origLastMatch + 1)];
+    stream.buffer.push(data[sliceFuncName](0, lastMatch));
+    if (asString) {
+        stream.matches.push(stream.buffer.join(""));
+    } else {
+        stream.matches.push(Buffer.concat(stream.buffer));
+    }
+    stream.buffer = [data[sliceFuncName](origLastMatch + 1)];
 
     if (stream.emitEvents) {
         emitEvents(stream);
     }
 }
 
-/**
- * Handle data from a binary stream
- */
-function handleBinaryData(stream, data) {
-    var i = data.length,
-        origLastMatch; //data after the first occurrence of delimiter
-    while (i--) {
-        if (data[i] === stream.delimiter) {
-            origLastMatch = i;
-            break;
-        }
-    }
-    if (i === -1) {
-        stream.buffer.push(data);
-        return;
-    }
-    var lastMatch = i;
-    while (i--) {
-        if (data[i] === stream.delimiter) {
-            stream.matches.push(data.slice(i + 1, lastMatch));
-            lastMatch = i;
-        }
-    }
-    //now that the loop is done, need to add on bufferString to the beginning of data
-    stream.buffer.push(data.slice(0, lastMatch));
-    stream.matches.push(Buffer.concat(stream.buffer));
-    stream.buffer = [data.slice(origLastMatch + 1)];
-
-    if (stream.emitEvents) {
-        emitEvents(stream);
-    }
-}
 
 /**
  * Read data from a string stream
@@ -86,7 +59,7 @@ function readStringData() {
     if (!data) {
         return;
     }
-    handleStringData(this, data);
+    handleData(this, true, data);
 }
 
 /**
@@ -97,47 +70,54 @@ function readBinaryData() {
     if (!data) {
         return;
     }
-    handleBinaryData(this, data);
+    handleData(this, false, data);
 }
 
 /**
  * Encoding should be what you set on the readableStream.
  */
 function DelimiterStream(readableStream, delimiter, encoding, oldStream, initialBuffer) {
-    events.EventEmitter.apply(this);
+    events.EventEmitter.call(this);
+    //todo: when we remove oldStream, check read()
+    if (!readableStream || "function" !== typeof readableStream.constructor.prototype.on) {
+        throw new Error("DelimiterStream requires a valid ReadableStream!");
+    }
 
-    this.delimiter = delimiter;
-    this.readableStream = readableStream;
     if (!encoding) {
         encoding = "binary";
     }
-    this.encoding = encoding;
+    if (!delimiter && encoding === 'binary') {
+        delimiter = 10; //"\n"
+    } else if (!delimiter) {
+        delimiter = "\n";
+    }
+
+    this._reFireListeners = {};
+    this.delimiter = delimiter;
+    this.readableStream = readableStream;
     this.emitEvents = false;
     this.matches = [];
     this.buffer = initialBuffer || [];
 
-    /**
-     * todo: there has to be a better way than storing the callbacks
-     * (without using arguments.callee.caller)
-     */
-    this.destroyCallback = this.destroy.bind(this);
-    readableStream.on('close', this.destroyCallback);
+    this._closeCallback = this.onStreamClose.bind(this);
+    readableStream.on('close', this._closeCallback);
 
     if (oldStream) {
+        console.warn("Deprecation warning: oldStream argument to DelimiterStream is deprecated!");
         if (encoding === "binary") {
-            this.listenCallback = handleBinaryData.bind(this, this);
+            this._dataCallback = handleData.bind(this, this, false);
         } else {
-            this.listenCallback = handleStringData.bind(this, this);
+            this._dataCallback = handleData.bind(this, this, true);
         }
-        readableStream.on('data', this.listenCallback);
+        readableStream.on('data', this._dataCallback);
         readableStream.resume();
     } else {
         if (encoding === "binary") {
-            this.listenCallback = readBinaryData.bind(this);
+            this._readableCallback = readBinaryData.bind(this);
         } else {
-            this.listenCallback = readStringData.bind(this);
+            this._readableCallback = readStringData.bind(this);
         }
-        readableStream.on('readable', this.listenCallback);
+        readableStream.on('readable', this._readableCallback);
     }
 }
 
@@ -151,28 +131,76 @@ DelimiterStream.prototype.resume = function() {
     this.emitEvents = true;
     //emit any events we might have missed
     emitEvents(this);
+    return this;
 };
 
 DelimiterStream.prototype.pause = function() {
     this.emitEvents = false;
+    return this;
+};
+
+DelimiterStream.prototype.addListener = function(type, listener) {
+    if (type === "readable") {
+        console.warn("Potentially invalid use of DelimiterStream. 'readable' events are not fired, only 'data' events.");
+        return this;
+    }
+    events.EventEmitter.prototype.addListener.call(this, type, listener);
+    if (this._reFireListeners[type] == null && type && type !== "data" && type !== "close") {
+        this._reFireListeners[type] = this.emit.bind(this, type);
+        this.readableStream.on(type, this._reFireListeners[type]);
+    }
+    return this;
+};
+DelimiterStream.prototype.on = DelimiterStream.prototype.addListener;
+
+DelimiterStream.prototype.removeListener = function(type, listener) {
+    events.EventEmitter.prototype.removeListener.call(this, type, listener);
+    if (type && this._events[type] == null && this._reFireListeners[type] != null) {
+        this.readableStream.removeListener(type, this._reFireListeners[type]);
+        delete this._reFireListeners[type];
+    }
+    return this;
+};
+
+DelimiterStream.prototype.removeAllListeners = function(type) {
+    events.EventEmitter.prototype.removeAllListeners.call(this, type);
+    if (type && this._reFireListeners[type] != null) {
+        this.readableStream.removeListener(type, this._reFireListeners[type]);
+        delete this._reFireListeners[type];
+    } else if (type == null) {
+        for (var t in this._reFireListeners) {
+            this.readableStream.removeListener(t, this._reFireListeners[t]);
+        }
+        this._reFireListeners = {};
+    }
+    return this;
+};
+
+DelimiterStream.prototype.onStreamClose = function() {
+    this.destroy();
+    if (arguments.length > 0) {
+        this.emit.call(this, ['close'].concat(arguments.length));
+    } else {
+        this.emit('close');
+    }
 };
 
 /**
- * When you're finished with a stream, call destroy to remove
- * any listeners. Note: this WILL remove any listeners you have
- * added to "data".
+ * When you're finished with a stream, call destroy to remove all listeners and cleanup.
  */
 DelimiterStream.prototype.destroy = function() {
-    if (!this.readableStream) {
-        return;
+    this.readableStream.removeListener('close', this._closeCallback);
+    if (this._dataCallback) {
+        this.readableStream.removeListener('data', this._dataCallback);
     }
-    this.readableStream.removeListener('close', this.destroyCallback);
-    this.readableStream.removeListener('readable', this.listenCallback);
-    this.readableStream.removeListener('data', this.listenCallback);
+    if (this._readableCallback) {
+        this.readableStream.removeListener('readable', this._readableCallback);
+    }
     this.buffer = [];
     this.emitEvents = false;
     this.removeAllListeners();
     this.readableStream = null;
+    return this;
 };
 
 /**

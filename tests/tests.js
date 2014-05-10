@@ -312,7 +312,8 @@ exports.removedListenersOld = function(test) {
 exports.oneMatchThenClose = function(test) {
     f = new FakeReader('utf8');
     f.write("\n", 275); //"\n"
-    var gotData = false;
+    var gotData = false,
+        gotClose = false;
     f.on('done', function(isOld) {
         test.equal(isOld, false); //sanity check
         test.ok(gotData);
@@ -320,6 +321,7 @@ exports.oneMatchThenClose = function(test) {
         //"close" the reader on nextTick
         f.close();
         process.nextTick(function() {
+            test.ok(gotClose);
             test.equal(events.EventEmitter.listenerCount(f, 'readable'), 0);
             test.equal(events.EventEmitter.listenerCount(f, 'data'), 0);
             test.equal(events.EventEmitter.listenerCount(f, 'close'), 0);
@@ -332,6 +334,9 @@ exports.oneMatchThenClose = function(test) {
         test.equal(data.length, 275);
         gotData = true;
     });
+    s.on('close', function (data) {
+        gotClose = true;
+    });
     s.resume();
 
     test.equal(events.EventEmitter.listenerCount(f, 'readable'), 1);
@@ -343,7 +348,8 @@ exports.oneMatchThenClose = function(test) {
 exports.oneMatchThenCloseOld = function(test) {
     f = new FakeOldReader('utf8');
     f.write("\n", 275); //"\n"
-    var gotData = false;
+    var gotData = false,
+        gotClose = false;
     f.on('done', function(isOld) {
         test.equal(isOld, true); //sanity check
         test.ok(gotData);
@@ -351,6 +357,7 @@ exports.oneMatchThenCloseOld = function(test) {
         //"close" the reader on nextTick
         f.close();
         process.nextTick(function() {
+            test.ok(gotClose);
             test.equal(events.EventEmitter.listenerCount(f, 'data'), 0);
             test.equal(events.EventEmitter.listenerCount(f, 'readable'), 0);
             test.equal(events.EventEmitter.listenerCount(f, 'close'), 0);
@@ -359,9 +366,12 @@ exports.oneMatchThenCloseOld = function(test) {
     });
 
     s = new DelimiterStream(f, "\n", "utf8", true);
-    s.on('data', function(data) {
+    s.on('data', function (data) {
         test.equal(data.length, 275);
         gotData = true;
+    });
+    s.on('close', function (data) {
+        gotClose = true;
     });
     s.resume();
 
@@ -370,4 +380,55 @@ exports.oneMatchThenCloseOld = function(test) {
     test.equal(events.EventEmitter.listenerCount(f, 'close'), 1);
 
     f.begin();
+};
+
+exports.passthruEvent = function (test) {
+    f = new FakeReader();
+    var gotError = false,
+        errorCallback = function (data) {
+            test.equal(data, "test");
+            gotError = true;
+        };
+    s = new DelimiterStream(f, "\n", "utf8");
+    s.on('error', errorCallback);
+    test.equal(events.EventEmitter.listenerCount(f, 'error'), 1);
+    f.emit('error', "test");
+    s.removeListener('error', errorCallback);
+    test.equal(events.EventEmitter.listenerCount(f, 'error'), 0);
+    test.ok(gotError);
+    test.done();
+};
+
+exports.passthruRemoveAllListeners = function (test) {
+    f = new FakeReader();
+    var gotError = false,
+        errorCallback = function (data) {
+            test.equal(data, "test");
+            gotError = true;
+        };
+    s = new DelimiterStream(f, "\n", "utf8");
+    s.on('error', errorCallback);
+    test.equal(events.EventEmitter.listenerCount(f, 'error'), 1);
+    f.emit('error', "test");
+    s.removeAllListeners('error');
+    test.equal(events.EventEmitter.listenerCount(f, 'error'), 0);
+    test.ok(gotError);
+    test.done();
+};
+
+exports.passthruRemoveAllAllListeners = function (test) {
+    f = new FakeReader();
+    var gotError = false,
+        errorCallback = function (data) {
+            test.equal(data, "test");
+            gotError = true;
+        };
+    s = new DelimiterStream(f, "\n", "utf8");
+    s.on('error', errorCallback);
+    test.equal(events.EventEmitter.listenerCount(f, 'error'), 1);
+    f.emit('error', "test");
+    s.removeAllListeners();
+    test.equal(events.EventEmitter.listenerCount(f, 'error'), 0);
+    test.ok(gotError);
+    test.done();
 };
