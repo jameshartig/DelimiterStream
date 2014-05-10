@@ -1,7 +1,7 @@
 DelimiterStream
 ===============
 
-Get delimiter-separated chunks of data from a Readable Stream in Node.js. As bytes are received
+Get delimiter-separated (e.g. new line) chunks of data from a Readable Stream in Node.js. As bytes are received
 through the stream, a "data" event will be emitted whenever the delimiter is seen. The event
 will contain the chunk of data after the last delimiter and before the one just seen. The
 chunk will **NOT include the delimiter**.
