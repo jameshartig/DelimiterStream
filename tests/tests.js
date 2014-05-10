@@ -432,3 +432,24 @@ exports.passthruRemoveAllAllListeners = function (test) {
     test.ok(gotError);
     test.done();
 };
+
+exports.stringOneMatchPassthru = function (test) {
+    f = new FakeReader('utf8');
+    s = new DelimiterStream(f, "\n", "utf8");
+    s.write("\n", 275); //"\n"
+
+    s.on('data', function (data) {
+        test.equal(data.length, 275);
+        gotData = true;
+    });
+    s.resume();
+
+    var gotData = false;
+    f.on('done', function (isOld) {
+        test.equal(isOld, false); //sanity check
+        test.ok(gotData);
+        test.done();
+    });
+
+    f.begin();
+};

@@ -77,17 +77,17 @@ function readBinaryData() {
  * Encoding should be what you set on the readableStream.
  */
 function DelimiterStream(readableStream, delimiter, encoding, oldStream, initialBuffer) {
-    events.EventEmitter.call(this);
     //todo: when we remove oldStream, check read()
-    if (!readableStream || "function" !== typeof readableStream.constructor.prototype.on) {
-        throw new Error("DelimiterStream requires a valid ReadableStream!");
+    if (!readableStream || typeof readableStream.on !== 'function') {
+        throw new Error('DelimiterStream requires a valid ReadableStream!');
     }
+    events.EventEmitter.call(this);
 
     if (!encoding) {
-        encoding = "binary";
+        encoding = 'binary';
     }
     if (!delimiter && encoding === 'binary') {
-        delimiter = 10; //"\n"
+        delimiter = 10; //'\n'
     } else if (!delimiter) {
         delimiter = "\n";
     }
@@ -103,8 +103,8 @@ function DelimiterStream(readableStream, delimiter, encoding, oldStream, initial
     readableStream.on('close', this._closeCallback);
 
     if (oldStream) {
-        console.warn("Deprecation warning: oldStream argument to DelimiterStream is deprecated!");
-        if (encoding === "binary") {
+        console.warn('Deprecation warning: oldStream argument to DelimiterStream is deprecated!');
+        if (encoding === 'binary') {
             this._dataCallback = handleData.bind(this, this, false);
         } else {
             this._dataCallback = handleData.bind(this, this, true);
@@ -112,7 +112,7 @@ function DelimiterStream(readableStream, delimiter, encoding, oldStream, initial
         readableStream.on('data', this._dataCallback);
         readableStream.resume();
     } else {
-        if (encoding === "binary") {
+        if (encoding === 'binary') {
             this._readableCallback = readBinaryData.bind(this);
         } else {
             this._readableCallback = readStringData.bind(this);
@@ -140,12 +140,12 @@ DelimiterStream.prototype.pause = function() {
 };
 
 DelimiterStream.prototype.addListener = function(type, listener) {
-    if (type === "readable") {
+    if (type === 'readable') {
         console.warn("Potentially invalid use of DelimiterStream. 'readable' events are not fired, only 'data' events.");
         return this;
     }
     events.EventEmitter.prototype.addListener.call(this, type, listener);
-    if (this._reFireListeners[type] == null && type && type !== "data" && type !== "close") {
+    if (this._reFireListeners[type] == null && type && type !== 'data' && type !== 'close') {
         this._reFireListeners[type] = this.emit.bind(this, type);
         this.readableStream.on(type, this._reFireListeners[type]);
     }
@@ -176,10 +176,11 @@ DelimiterStream.prototype.removeAllListeners = function(type) {
     return this;
 };
 
-DelimiterStream.prototype.onStreamClose = function() {
+//on underlying stream close we should destroy and emit close
+DelimiterStream.prototype.onStreamClose = function () {
     this.destroy();
     if (arguments.length > 0) {
-        this.emit.call(this, ['close'].concat(arguments.length));
+        this.emit.call(this, ['close'].concat(arguments));
     } else {
         this.emit('close');
     }
@@ -199,12 +200,24 @@ DelimiterStream.prototype.destroy = function() {
     this.buffer = [];
     this.emitEvents = false;
     this.removeAllListeners();
+    if (typeof this.readableStream.destroy === 'function') {
+        this.readableStream.destroy.apply(this.readableStream, arguments);
+    }
     this.readableStream = null;
     return this;
 };
 
+//some helper passthru events
+var passthruEvents = ['write', 'connect', 'end', 'ref', 'unref', 'setTimeout', 'abort'];
+do {
+    var e = passthruEvents.pop();
+    DelimiterStream.prototype[e] = function () {
+        this.readableStream[e].apply(this.readableStream, arguments);
+    };
+} while (passthruEvents[0] != null);
+
 /**
- * Helper functions
+ * Helper getter functions
  */
 DelimiterStream.prototype.getStream = function() {
     return this.readableStream;
