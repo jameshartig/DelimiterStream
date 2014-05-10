@@ -86,10 +86,12 @@ function DelimiterStream(readableStream, delimiter, encoding, oldStream, initial
     if (!encoding) {
         encoding = 'binary';
     }
-    if (!delimiter && encoding === 'binary') {
-        delimiter = 10; //'\n'
-    } else if (!delimiter) {
+    if (!delimiter) {
         delimiter = "\n";
+    }
+    //if you pass in "\n" but encoding is binary
+    if (encoding === 'binary' && typeof delimiter !== 'number') {
+        delimiter = delimiter.charCodeAt(0);
     }
 
     this._reFireListeners = {};

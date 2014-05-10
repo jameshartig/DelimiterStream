@@ -453,3 +453,24 @@ exports.stringOneMatchPassthru = function (test) {
 
     f.begin();
 };
+
+exports.defaultArgs = function (test) {
+    f = new FakeReader();
+    s = new DelimiterStream(f);
+    s.write(10, 275); //"\n"
+
+    s.on('data', function (data) {
+        test.equal(data.length, 275);
+        gotData = true;
+    });
+    s.resume();
+
+    var gotData = false;
+    f.on('done', function (isOld) {
+        test.equal(isOld, false); //sanity check
+        test.ok(gotData);
+        test.done();
+    });
+
+    f.begin();
+};
