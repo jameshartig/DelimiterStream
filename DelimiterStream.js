@@ -214,10 +214,11 @@ DelimiterStream.prototype.destroy = function() {
 //some helper passthru events
 var passthruEvents = ['write', 'connect', 'end', 'ref', 'unref', 'setTimeout', 'abort'];
 do {
-    var e = passthruEvents.pop();
-    DelimiterStream.prototype[e] = function () {
-        this.readableStream[e].apply(this.readableStream, arguments);
-    };
+    (function(e) {
+        DelimiterStream.prototype[e] = function () {
+            this.readableStream[e].apply(this.readableStream, arguments);
+        };
+    }(passthruEvents.pop()));
 } while (passthruEvents[0] != null);
 
 /**
