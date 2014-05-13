@@ -474,3 +474,25 @@ exports.defaultArgs = function (test) {
 
     f.begin();
 };
+
+exports.passthruClose = function (test) {
+    f = new FakeReader();
+    var gotError = false,
+        closeCallback = function (data, data2) {
+            test.equal(data, "test");
+            test.equal(data2, "test2");
+            gotError = true;
+        };
+    s = new DelimiterStream(f, "\n", "utf8");
+    s.on('close', closeCallback);
+    test.equal(events.EventEmitter.listenerCount(f, 'close'), 1);
+    f.emit('close', "test", "test2");
+    s.removeListener('error', closeCallback);
+    test.equal(events.EventEmitter.listenerCount(f, 'close'), 0);
+    test.equal(events.EventEmitter.listenerCount(f, 'readable'), 0);
+    //we're no longer removing the self event listners by default
+    test.equal(events.EventEmitter.listenerCount(s, 'close'), 1);
+    test.equal(s.readableStream, null);
+    test.ok(gotError);
+    test.done();
+};

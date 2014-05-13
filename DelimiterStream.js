@@ -18,7 +18,7 @@ function emitEvents(stream) {
 function handleData(stream, asString, data) {
     var i = data.length,
         origLastMatch, //data after the first occurrence of delimiter
-        sliceFuncName = asString ? 'substring': 'slice';
+        sliceFuncName = asString ? 'substring' : 'slice';
     while (i--) {
         if (data[i] === stream.delimiter) {
             origLastMatch = i;
@@ -167,6 +167,13 @@ DelimiterStream.prototype.removeListener = function(type, listener) {
 
 DelimiterStream.prototype.removeAllListeners = function(type) {
     events.EventEmitter.prototype.removeAllListeners.call(this, type);
+    if (this.readableStream) {
+        this.removeAllStreamListeners();
+    }
+    return this;
+};
+
+DelimiterStream.prototype.removeAllStreamListeners = function(type) {
     if (type && this._reFireListeners[type] != null) {
         this.readableStream.removeListener(type, this._reFireListeners[type]);
         delete this._reFireListeners[type];
@@ -179,14 +186,15 @@ DelimiterStream.prototype.removeAllListeners = function(type) {
     return this;
 };
 
+
 //on underlying stream close we should destroy and emit close
-DelimiterStream.prototype.onStreamClose = function () {
-    this.destroy();
+DelimiterStream.prototype.onStreamClose = function() {
     if (arguments.length > 0) {
-        this.emit.call(this, ['close'].concat(arguments));
+        this.emit.apply(this, Array.prototype.concat.apply(['close'], arguments));
     } else {
         this.emit('close');
     }
+    this.destroy();
 };
 
 /**
@@ -202,11 +210,11 @@ DelimiterStream.prototype.destroy = function() {
     }
     this.buffer = [];
     this.emitEvents = false;
-    this.removeAllListeners();
     if (typeof this.readableStream.destroy === 'function') {
         this.readableStream.destroy.apply(this.readableStream, arguments);
     }
     this.destroyed = true;
+    this.removeAllStreamListeners();
     this.readableStream = null;
     return this;
 };
@@ -215,7 +223,7 @@ DelimiterStream.prototype.destroy = function() {
 var passthruEvents = ['write', 'connect', 'end', 'ref', 'unref', 'setTimeout', 'abort'];
 do {
     (function(e) {
-        DelimiterStream.prototype[e] = function () {
+        DelimiterStream.prototype[e] = function() {
             this.readableStream[e].apply(this.readableStream, arguments);
         };
     }(passthruEvents.pop()));
