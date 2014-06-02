@@ -1,6 +1,7 @@
 //todo: utilize nodeunit groups
 var assert = require("assert"),
     events = require('events'),
+    net = require('net'),
     FakeReader = require('./lib/FakeReader.js'),
     FakeOldReader = require('./lib/FakeOldReader.js'),
     DelimiterStream = require("../DelimiterStream.js"),
@@ -494,5 +495,34 @@ exports.passthruClose = function (test) {
     test.equal(events.EventEmitter.listenerCount(s, 'close'), 1);
     test.equal(s.readableStream, null);
     test.ok(gotError);
+    test.done();
+};
+
+exports.invalidEncodingThrows = function (test) {
+    var sock = new net.Socket(),
+        gotError = false;
+    sock.setEncoding('binary');
+    try {
+        s = new DelimiterStream(sock, "\n", 'utf8');
+    } catch (e) {
+        if (e instanceof Error && e.message.indexOf('DelimiterStream was setup') === 0) {
+            gotError = true;
+        }
+    }
+    test.ok(gotError);
+    test.done();
+};
+
+exports.setEncodingPassedIn = function (test) {
+    var sock = new net.Socket();
+    s = new DelimiterStream(sock, "\n", 'utf8');
+    test.equal('utf8', sock._readableState.encoding);
+    test.done();
+};
+
+exports.setEncodingPassedInBinary = function (test) {
+    var sock = new net.Socket();
+    s = new DelimiterStream(sock, "\n");
+    test.equal('binary', sock._readableState.encoding);
     test.done();
 };

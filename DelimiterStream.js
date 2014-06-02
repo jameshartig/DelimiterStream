@@ -94,6 +94,18 @@ function DelimiterStream(readableStream, delimiter, encoding, oldStream, initial
         delimiter = delimiter.charCodeAt(0);
     }
 
+    if (readableStream._readableState) {
+        if (typeof readableStream._readableState.encoding === 'string' && readableStream._readableState.encoding != encoding) {
+            throw new Error('DelimiterStream was setup with encoding ' + encoding + ' but stream is encoding ' + readableStream._readableState.encoding);
+        } else if (readableStream._readableState.encoding === null) {
+            if (typeof readableStream.setEncoding === 'function') {
+                readableStream.setEncoding(encoding);
+            } else {
+                throw new Error('DelimiterStream was setup with encoding ' + encoding + ' but stream has default encoding. Set encoding on the stream first explicitly.');
+            }
+        }
+    }
+
     this._reFireListeners = {};
     this.delimiter = delimiter;
     this.readableStream = readableStream;
