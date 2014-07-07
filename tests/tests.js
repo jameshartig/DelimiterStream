@@ -526,3 +526,11 @@ exports.setEncodingPassedInBinary = function (test) {
     test.equal('binary', sock._readableState.encoding);
     test.done();
 };
+
+exports.destroyTwice = function (test) {
+    f = new FakeReader();
+    s = new DelimiterStream(f, "\n");
+    s.destroy();
+    s.destroy();
+    test.done();
+};

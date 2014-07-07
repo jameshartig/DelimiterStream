@@ -213,6 +213,12 @@ DelimiterStream.prototype.onStreamClose = function() {
  * When you're finished with a stream, call destroy to remove all listeners and cleanup.
  */
 DelimiterStream.prototype.destroy = function() {
+    this.buffer = [];
+    this.emitEvents = false;
+    this.destroyed = true;
+    if (this.readableStream == null) {
+        return this;
+    }
     this.readableStream.removeListener('close', this._closeCallback);
     if (this._dataCallback) {
         this.readableStream.removeListener('data', this._dataCallback);
@@ -220,12 +226,9 @@ DelimiterStream.prototype.destroy = function() {
     if (this._readableCallback) {
         this.readableStream.removeListener('readable', this._readableCallback);
     }
-    this.buffer = [];
-    this.emitEvents = false;
     if (typeof this.readableStream.destroy === 'function') {
         this.readableStream.destroy.apply(this.readableStream, arguments);
     }
-    this.destroyed = true;
     this.removeAllStreamListeners();
     this.readableStream = null;
     return this;
