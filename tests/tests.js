@@ -534,3 +534,13 @@ exports.destroyTwice = function (test) {
     s.destroy();
     test.done();
 };
+
+exports.writeAfterDestroy = function (test) {
+    f = new FakeReader();
+    s = new DelimiterStream(f, "\n");
+    s.destroy();
+    s.on('error', function() {
+        test.done();
+    });
+    s.write();
+};

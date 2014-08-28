@@ -160,6 +160,9 @@ DelimiterStream.prototype.addListener = function(type, listener) {
         return this;
     }
     events.EventEmitter.prototype.addListener.call(this, type, listener);
+    if (this.readableStream == null) {
+        return this;
+    }
     if (this._reFireListeners[type] == null && type && type !== 'data' && type !== 'close') {
         this._reFireListeners[type] = this.emit.bind(this, type);
         this.readableStream.on(type, this._reFireListeners[type]);
@@ -170,6 +173,9 @@ DelimiterStream.prototype.on = DelimiterStream.prototype.addListener;
 
 DelimiterStream.prototype.removeListener = function(type, listener) {
     events.EventEmitter.prototype.removeListener.call(this, type, listener);
+    if (this.readableStream == null) {
+        return this;
+    }
     if (type && this._events[type] == null && this._reFireListeners[type] != null) {
         this.readableStream.removeListener(type, this._reFireListeners[type]);
         delete this._reFireListeners[type];
@@ -179,7 +185,7 @@ DelimiterStream.prototype.removeListener = function(type, listener) {
 
 DelimiterStream.prototype.removeAllListeners = function(type) {
     events.EventEmitter.prototype.removeAllListeners.call(this, type);
-    if (this.readableStream) {
+    if (this.readableStream != null) {
         this.removeAllStreamListeners();
     }
     return this;
@@ -187,11 +193,15 @@ DelimiterStream.prototype.removeAllListeners = function(type) {
 
 DelimiterStream.prototype.removeAllStreamListeners = function(type) {
     if (type && this._reFireListeners[type] != null) {
-        this.readableStream.removeListener(type, this._reFireListeners[type]);
+        if (this.readableStream != null) {
+            this.readableStream.removeListener(type, this._reFireListeners[type]);
+        }
         delete this._reFireListeners[type];
     } else if (type == null) {
-        for (var t in this._reFireListeners) {
-            this.readableStream.removeListener(t, this._reFireListeners[t]);
+        if (this.readableStream != null) {
+            for (var t in this._reFireListeners) {
+                this.readableStream.removeListener(t, this._reFireListeners[t]);
+            }
         }
         this._reFireListeners = {};
     }
@@ -239,6 +249,10 @@ var passthruEvents = ['write', 'connect', 'end', 'ref', 'unref', 'setTimeout', '
 do {
     (function(e) {
         DelimiterStream.prototype[e] = function() {
+            if (this.readableStream == null) {
+                this.emit('error', new Error(e + ' called after stream closed'));
+                return;
+            }
             this.readableStream[e].apply(this.readableStream, arguments);
         };
     }(passthruEvents.pop()));
