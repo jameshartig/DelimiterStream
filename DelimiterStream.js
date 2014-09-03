@@ -97,13 +97,14 @@ function DelimiterStream(readableStream, delimiter, encoding, oldStream, initial
     if (readableStream._readableState) {
         if (typeof readableStream._readableState.encoding === 'string' && readableStream._readableState.encoding != encoding) {
             throw new Error('DelimiterStream was setup with encoding ' + encoding + ' but stream is encoding ' + readableStream._readableState.encoding);
-        } else if (readableStream._readableState.encoding === null) {
+        } else if (readableStream._readableState.encoding === null && encoding !== 'binary') {
             if (typeof readableStream.setEncoding === 'function') {
                 readableStream.setEncoding(encoding);
             } else {
                 throw new Error('DelimiterStream was setup with encoding ' + encoding + ' but stream has default encoding. Set encoding on the stream first explicitly.');
             }
         }
+        //there's no way to unset the encoding from utf8 -> binary without hacking up _readableState
     }
 
     this._reFireListeners = {};

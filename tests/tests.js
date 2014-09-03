@@ -499,11 +499,11 @@ exports.passthruClose = function (test) {
 };
 
 exports.invalidEncodingThrows = function (test) {
-    var sock = new net.Socket(),
-        gotError = false;
-    sock.setEncoding('binary');
+    var gotError = false;
+    f = new FakeReader();
+    f.setEncoding('hex');
     try {
-        s = new DelimiterStream(sock, "\n", 'utf8');
+        s = new DelimiterStream(f, "\n", 'utf8');
     } catch (e) {
         if (e instanceof Error && e.message.indexOf('DelimiterStream was setup') === 0) {
             gotError = true;
@@ -514,16 +514,16 @@ exports.invalidEncodingThrows = function (test) {
 };
 
 exports.setEncodingPassedIn = function (test) {
-    var sock = new net.Socket();
-    s = new DelimiterStream(sock, "\n", 'utf8');
-    test.equal('utf8', sock._readableState.encoding);
+    f = new FakeReader();
+    s = new DelimiterStream(f, "\n", 'utf8');
+    test.equal('utf8', f._readableState.encoding);
     test.done();
 };
 
 exports.setEncodingPassedInBinary = function (test) {
-    var sock = new net.Socket();
-    s = new DelimiterStream(sock, "\n");
-    test.equal('binary', sock._readableState.encoding);
+    f = new FakeReader();
+    s = new DelimiterStream(f, "\n");
+    test.equal(null, f._readableState.encoding);
     test.done();
 };
 

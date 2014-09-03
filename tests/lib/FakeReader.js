@@ -10,16 +10,22 @@ function FakeReader(enc, n, i) {
     this.position = 0;
     this.max = n;
     this.interval = i || 250; //interval which causes a break in the read loop
-    this.encoding = enc;
+    this._readableState = {encoding: null};
+    if (enc) {
+        this.setEncoding(enc);
+    }
 }
 util.inherits(FakeReader, events.EventEmitter);
 
 FakeReader.prototype.write = function() {
-    if (this.encoding) {
+    if (this._readableState.encoding) {
         this.buffer.write.apply(this.buffer, Array.prototype.slice.call(arguments, 0));
     } else {
         this.buffer[arguments[1]] = arguments[0];
     }
+};
+FakeReader.prototype.setEncoding = function(encoding) {
+    this._readableState.encoding = encoding;
 };
 
 FakeReader.prototype.read = function(n) {
@@ -36,7 +42,7 @@ FakeReader.prototype.read = function(n) {
         }
     }
     var resp;
-    if (this.encoding) {
+    if (this._readableState.encoding) {
         resp = this.buffer.slice(start, this.position).toString(this.encoding);
     } else {
         resp = this.buffer.slice(start, this.position);
