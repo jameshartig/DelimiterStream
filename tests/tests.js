@@ -1,6 +1,5 @@
 //todo: utilize nodeunit groups
-var assert = require("assert"),
-    events = require('events'),
+var events = require('events'),
     net = require('net'),
     FakeReader = require('./lib/FakeReader.js'),
     FakeOldReader = require('./lib/FakeOldReader.js'),

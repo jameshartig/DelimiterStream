@@ -6,20 +6,20 @@
   "directories": {
     "test": "tests"
   },
+  "devDependencies": {
+    "nodeunit": "0.9.0",
+    "jquery-deferred": "0.3.0"
+  },
   "scripts": {
     "test": "nodeunit tests"
   },
+  "engines": {"node": ">=0.10.0"},
+  "engineStrict": true,
   "repository": {
     "type": "git",
     "url": "git://github.com/fastest963/DelimiterStream.git"
   },
-  "keywords": [
-    "streams",
-    "delimiter",
-    "readable",
-    "socket",
-    "new line"
-  ],
+  "keywords": ["streams", "delimiter", "readable", "socket", "new line"],
   "author": "James Hartig <fastest963@gmail.com>",
   "license": "MIT",
   "readmeFilename": "README.md"
