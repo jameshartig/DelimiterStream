@@ -1,49 +1,79 @@
 var util = require('util'),
-    events = require('events');
+    events = require('events'),
+    undefined;
 
 /**
  * Emit "data" events for each match
  */
 function emitEvents(stream) {
-    var i = stream.matches.length;
-    while (i--) {
-        stream.emit('data', stream.matches[i]);
+    //if emitEvents gets called while in emitEvents we don't want to screw up the order
+    if (stream._emittingMatches) {
+        return;
     }
+
+    var matches = stream.matches,
+        i = matches.length;
     stream.matches = [];
+    stream._emittingMatches = true;
+    while (i--) {
+        stream.emit('data', matches[i]);
+    }
+    stream._emittingMatches = false;
+    //test to see if someone tried to emit events within emitting events
+    if (stream.emitEvents && stream.matches[0] !== undefined) {
+        emitEvents(stream);
+    }
 }
 
 /**
  * Handle data from a string stream
  */
 function handleData(stream, asString, data) {
-    var i = data.length,
-        origLastMatch, //data after the first occurrence of delimiter
-        sliceFuncName = asString ? 'substring' : 'slice';
+    var dataLen = data.length,
+        i = dataLen,
+        sliceFuncName = asString ? 'substring' : 'slice',
+        trailingDataIndex, //index of data after the last delimiter match in data
+        lastMatchIndex;
+    //first start going back through data to find the last match
+    //we do this loop separately so we can just store the index of the last match and then add that to the buffer at the end for the next packet
     while (i--) {
         if (data[i] === stream.delimiter) {
-            origLastMatch = i;
+            //now that we found the match, store the index (+1 so we don't store the delimiter)
+            trailingDataIndex = i + 1;
             break;
         }
     }
+    //if we didn't find a match at all, just push the data onto the buffer
     if (i === -1) {
         stream.buffer.push(data);
         return;
     }
-    var lastMatch = i;
+    lastMatchIndex = i;
     while (i--) {
         if (data[i] === stream.delimiter) {
-            stream.matches.push(data[sliceFuncName](i + 1, lastMatch));
-            lastMatch = i;
+            //make sure we ignore back-to-back delimiters
+            if (i + 1 < lastMatchIndex) {
+                stream.matches.push(data[sliceFuncName](i + 1, lastMatchIndex));
+            }
+            lastMatchIndex = i;
         }
     }
-    //now that the loop is done, need to add on bufferString to the beginning of data
-    stream.buffer.push(data[sliceFuncName](0, lastMatch));
+    //since the loop stops at the beginning of data we need to store the bytes before the first match in the string
+    if (lastMatchIndex > 0) {
+        stream.buffer.push(data[sliceFuncName](0, lastMatchIndex));
+    }
+    //add the leftover buffer to the matches at the end (beginning when we emit events)
     if (asString) {
         stream.matches.push(stream.buffer.join(""));
     } else {
         stream.matches.push(Buffer.concat(stream.buffer));
     }
-    stream.buffer = [data[sliceFuncName](origLastMatch + 1)];
+
+    stream.buffer = [];
+    //make sure the lastMatchIndex isn't the end
+    if (lastMatchIndex < dataLen) {
+        stream.buffer.push(data[sliceFuncName](trailingDataIndex));
+    }
 
     if (stream.emitEvents) {
         emitEvents(stream);

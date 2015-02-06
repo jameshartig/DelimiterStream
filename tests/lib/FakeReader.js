@@ -11,6 +11,7 @@ function FakeReader(enc, n, i) {
     this.max = n;
     this.interval = i || 250; //interval which causes a break in the read loop
     this._readableState = {encoding: null};
+    this.done = false;
     if (enc) {
         this.setEncoding(enc);
     }
@@ -30,6 +31,7 @@ FakeReader.prototype.setEncoding = function(encoding) {
 
 FakeReader.prototype.read = function(n) {
     if (this.position >= this.max) {
+        this.done = true;
         this.emit('done', false); //not old style
         return null;
     }
@@ -47,9 +49,13 @@ FakeReader.prototype.read = function(n) {
     } else {
         resp = this.buffer.slice(start, this.position);
     }
-    setTimeout(function() {
+    process.nextTick(function() {
+        //don't trigger readable if we're already done
+        if (this.done) {
+            return;
+        }
         this.emit('readable');
-    }.bind(this), 20);
+    }.bind(this));
     return resp;
 };
 FakeReader.prototype.begin = function() {

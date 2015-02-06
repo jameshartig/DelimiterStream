@@ -201,7 +201,7 @@ exports.stringMatchLastOld = function(test) {
 };
 
 exports.binaryTenMatches = function(test) {
-    var matchIndexes = [1,50,250,600,601,603,609,800,900,1000];
+    var matchIndexes = [1,50,250,600,602,605,609,800,900,1000];
 
     var oldStream = !!test.__oldStyle;
     if (oldStream) {
@@ -238,7 +238,7 @@ exports.binaryTenMatchesOld = function(test) {
 };
 
 exports.stringTenMatches = function(test) {
-    var matchIndexes = [1,50,250,600,601,603,609,800,900,1000];
+    var matchIndexes = [1,50,250,600,602,605,609,800,900,1000];
 
     var oldStream = !!test.__oldStyle;
     if (oldStream) {
@@ -542,4 +542,76 @@ exports.writeAfterDestroy = function (test) {
         test.done();
     });
     s.write();
+};
+
+exports.matchBackToBack = function(test) {
+    var matchIndexes = [11,12,13],
+        chunkID = 0,
+        actualChunks = 1; //we're ignoring the matches back to back
+
+    var oldStream = !!test.__oldStyle;
+    if (oldStream) {
+        f = new FakeOldReader();
+    } else {
+        f = new FakeReader();
+    }
+    matchIndexes.forEach(function(m) {
+        f.write(10, m); //"\n"
+    });
+
+    f.on('done', function(isOld) {
+        test.equal(isOld, oldStream); //sanity check
+        test.equal(actualChunks, chunkID);
+        test.done();
+    });
+
+    s = new DelimiterStream(f, 10, "binary", oldStream);
+    var lastMatchIndex = 0,
+        currentMatchIndex;
+    s.on('data', function(data) {
+        currentMatchIndex = matchIndexes[chunkID];
+        test.equal(data.length, currentMatchIndex - lastMatchIndex);
+        lastMatchIndex = currentMatchIndex + 1;
+        chunkID++;
+    });
+    s.resume();
+    f.begin();
+};
+exports.matchBackToBackOld = function(test) {
+    test.__oldStyle = true;
+    exports.matchBackToBack(test);
+};
+
+
+exports.dataInData = function(test) {
+    var matchIndexes = [4, 9, 19],
+        f = new FakeReader(null, 20, 5),
+        chunkID = 0,
+        actualChunks = 3; //we're ignoring the matches back to back
+
+    f.write(10, 4);
+    f.write(10, 9);
+
+    f.on('done', function() {
+        test.equal(actualChunks, chunkID);
+        test.done();
+    });
+
+    s = new DelimiterStream(f);
+    var lastMatchIndex = 0,
+        currentMatchIndex;
+    s.on('data', function(data) {
+        currentMatchIndex = matchIndexes[chunkID];
+        test.equal(data.length, currentMatchIndex - lastMatchIndex);
+        lastMatchIndex = currentMatchIndex + 1;
+        //now force DelimiterStream to start reading the next chunk
+        if (chunkID === 1) {
+            f.write(10, 19);
+            //now ghetto force a read
+            s._readableCallback();
+        }
+        chunkID++;
+    });
+    s.resume();
+    f.begin();
 };
