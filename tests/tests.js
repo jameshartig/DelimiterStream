@@ -6,6 +6,20 @@ var events = require('events'),
     DelimiterStream = require("../DelimiterStream.js"),
     f, s;
 
+//polyfill for 0.8.x node
+if (events.EventEmitter.listenerCount === undefined) {
+    events.EventEmitter.listenerCount = function(emitter, type) {
+        var ret;
+        if (!emitter._events || !emitter._events[type])
+            ret = 0;
+        else if (typeof emitter._events[type] === 'function')
+            ret = 1;
+        else
+            ret = emitter._events[type].length;
+        return ret;
+    };
+}
+
 exports.noMatches = function(test) {
     //test without any matches
     var oldStream = !!test.__oldStyle;
