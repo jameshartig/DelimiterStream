@@ -1,6 +1,8 @@
 DelimiterStream
 ===============
 
+[![Join the chat at https://gitter.im/fastest963/DelimiterStream](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/fastest963/DelimiterStream?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 Get delimiter-separated (e.g. new line) chunks of data from a Readable Stream in Node.js. As bytes are received
 through the stream, a "data" event will be emitted whenever the delimiter is seen. The event
 will contain the chunk of data after the last delimiter and before the one just seen. The
