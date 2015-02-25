@@ -3,6 +3,7 @@ var events = require('events'),
     net = require('net'),
     FakeReader = require('./lib/FakeReader.js'),
     FakeOldReader = require('./lib/FakeOldReader.js'),
+    DataEmitter = require('./lib/DataEmitter.js'),
     DelimiterStream = require("../DelimiterStream.js"),
     f, s;
 
@@ -628,5 +629,56 @@ exports.dataInData = function(test) {
         chunkID++;
     });
     s.resume();
+    f.begin();
+};
+
+exports.wrapCtxArgs = function(test) {
+    var gotData = false,
+        ctx = this,
+        obj = {},
+        obj2 = {};
+    f = new DataEmitter();
+    f.write(10, 1); //"\n"
+    f.on('done', function() {
+        test.ok(gotData);
+        test.done();
+    });
+    f.on('data', DelimiterStream.wrap(function(o, o2, data) {
+        test.strictEqual(ctx, this);
+        test.strictEqual(o, obj);
+        test.strictEqual(o2, obj2);
+        test.equal(data.length, 1);
+        gotData = true;
+    }, ctx, obj, obj2));
+    f.begin();
+};
+
+exports.wrapBinaryOneMatch = function(test) {
+    var gotData = false;
+    f = new DataEmitter();
+    f.write(10, 275); //"\n"
+    f.on('done', function() {
+        test.ok(gotData);
+        test.done();
+    });
+    f.on('data', DelimiterStream.wrap(function(data) {
+        test.equal(data.length, 275);
+        gotData = true;
+    }));
+    f.begin();
+};
+
+exports.wrapStringOneMatch = function(test) {
+    var gotData = false;
+    f = new DataEmitter('utf8');
+    f.write("\n", 275); //"\n"
+    f.on('done', function() {
+        test.ok(gotData);
+        test.done();
+    });
+    f.on('data', DelimiterStream.wrap(function(data) {
+        test.equal(data.length, 275);
+        gotData = true;
+    }));
     f.begin();
 };
