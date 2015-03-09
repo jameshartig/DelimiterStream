@@ -73,7 +73,7 @@
             stream.matches.push(Buffer.concat(stream.buffer));
         }
 
-        stream.buffer = [];
+        stream.buffer.length = 0;
         //make sure the lastMatchIndex isn't the end
         if (lastMatchIndex < dataLen) {
             stream.buffer.push(data[sliceFuncName](trailingDataIndex));
@@ -321,6 +321,8 @@
         this.delimiter = opts.delimiter || "\n";
         this.matches = [];
         this.buffer = [];
+        this._isKnownType = false;
+        this._isString = true;
     }
     WrapStream.prototype.emit = function(eventName, data) {
         if (eventName !== 'data' || this.callback === undefined) {
@@ -335,11 +337,45 @@
             this.callback.call(this.callbackCtx, data);
         }
     };
+    WrapStream.prototype.handleData = function(data) {
+        if (this._isKnownType === false) {
+            if (isNode && Buffer.isBuffer(data)) {
+                this._isString = false;
+                if (typeof this.delimiter === 'string') {
+                    this.delimiter = this.delimiter.charCodeAt(0);
+                }
+            }
+            this._isKnownType = true;
+        }
+        //null means we should flush the data we have left
+        if (!data) {
+            if (data === null) {
+                this.flushData();
+                return;
+            }
+            return;
+        }
+        handleData(this, this._isString, data);
+    };
+    WrapStream.prototype.flushData = function() {
+        if (this._isKnownType === false || this.buffer.length === 0) {
+            return;
+        }
+        var lastMatch;
+        //add the leftover buffer to the matches at the end (beginning when we emit events)
+        if (this._isString) {
+            lastMatch = this.buffer.join("");
+        } else {
+            lastMatch = Buffer.concat(this.buffer);
+        }
+        if (lastMatch.length > 0) {
+            this.matches.push(lastMatch);
+            emitEvents(this);
+        }
+    };
 
     DelimiterStream.wrap = function(opts, fn, ctx /*, [...args] */) {
-        var isKnownType = false,
-            isString = true,
-            argsSkip = 3, //wrap(opts, function, ctx)
+        var argsSkip = 3, //wrap(opts, function, ctx)
             options = opts,
             callback = fn,
             callbackContext = ctx,
@@ -354,20 +390,7 @@
         args = arguments.length > argsSkip ? Array.prototype.slice.call(arguments, argsSkip).concat([undefined]) : null;
         stream = new WrapStream(options, callback, callbackContext, args);
         return function(data) {
-            if (isKnownType === false) {
-                if (isNode && Buffer.isBuffer(data)) {
-                    isString = false;
-                    if (typeof stream.delimiter === 'string') {
-                        stream.delimiter = stream.delimiter.charCodeAt(0);
-                    }
-                }
-                isKnownType = true;
-            }
-            try {
-                handleData(stream, isString, data);
-            } catch (e) {
-                console.log(e);
-            }
+            stream.handleData(data);
         }
     };
 
