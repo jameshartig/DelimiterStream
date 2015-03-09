@@ -43,11 +43,12 @@ DataEmitter.prototype.read = function(n) {
             break;
         }
     }
-    var data;
+    var end = Math.min(this.max, this.position),
+        data;
     if (this._readableState.encoding) {
-        data = this.buffer.slice(start, this.position).toString(this.encoding);
+        data = this.buffer.slice(start, end).toString(this.encoding);
     } else {
-        data = this.buffer.slice(start, this.position);
+        data = this.buffer.slice(start, end);
     }
     this.emit('data', data);
     process.nextTick(function() {
