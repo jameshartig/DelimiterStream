@@ -681,3 +681,29 @@ exports.wrapStringOneMatch = function(test) {
     }));
     f.begin();
 };
+
+exports.wrapFlush = function(test) {
+    var gotData = false,
+        gotFlush = false,
+        max = 300,
+        wrap = DelimiterStream.wrap(function(data) {
+            if (gotData) {
+                //minus 1 for \n
+                test.equal(data.length, max - 275 - 1);
+                gotFlush = true;
+            } else {
+                test.equal(data.length, 275);
+                gotData = true;
+            }
+        });
+    f = new DataEmitter('utf8', max);
+    f.write("\n", 275); //"\n"
+    f.on('done', function() {
+        test.ok(gotData);
+        wrap(null);
+        test.ok(gotFlush);
+        test.done();
+    });
+    f.on('data', wrap);
+    f.begin();
+};
