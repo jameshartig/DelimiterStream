@@ -215,7 +215,11 @@ DelimiterStream.prototype.removeListener = function(type, listener) {
 };
 
 DelimiterStream.prototype.removeAllListeners = function(type) {
-    events.EventEmitter.prototype.removeAllListeners.call(this, type);
+    var args = [];
+    if (type !== undefined) {
+        args.push(type);
+    }
+    events.EventEmitter.prototype.removeAllListeners.apply(this, args);
     if (this.readableStream != null) {
         this.removeAllStreamListeners();
     }

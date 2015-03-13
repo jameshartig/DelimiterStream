@@ -443,6 +443,7 @@ exports.passthruRemoveAllAllListeners = function (test) {
     f.emit('error', "test");
     s.removeAllListeners();
     test.equal(events.EventEmitter.listenerCount(f, 'error'), 0);
+    test.equal(events.EventEmitter.listenerCount(s, 'error'), 0);
     test.ok(gotError);
     test.done();
 };
