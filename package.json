@@ -13,8 +13,7 @@
   "scripts": {
     "test": "nodeunit tests"
   },
-  "engines": {"node": ">=0.8.28"},
-  "engineStrict": true,
+  "engines": {"node": ">=0.10.0"},
   "repository": {
     "type": "git",
     "url": "git://github.com/fastest963/DelimiterStream.git"

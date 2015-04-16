@@ -115,7 +115,7 @@
         /**
          * Encoding should be what you set on the readableStream.
          */
-        DelimiterStream = function(readableStream, delimiter, encoding, oldStream, initialBuffer) {
+        DelimiterStream = function(readableStream, delimiter, encoding) {
             //todo: when we remove oldStream, check read()
             if (!readableStream || typeof readableStream.on !== 'function') {
                 throw new Error('DelimiterStream requires a valid ReadableStream!');
@@ -157,23 +157,12 @@
             this._closeCallback = this.onStreamClose.bind(this);
             readableStream.on('close', this._closeCallback);
 
-            if (oldStream) {
-                console.warn('Deprecation warning: oldStream argument to DelimiterStream is deprecated!');
-                if (encoding === 'binary') {
-                    this._dataCallback = handleData.bind(this, this, false);
-                } else {
-                    this._dataCallback = handleData.bind(this, this, true);
-                }
-                readableStream.on('data', this._dataCallback);
-                readableStream.resume();
+            if (encoding === 'binary') {
+                this._readableCallback = readBinaryData.bind(this);
             } else {
-                if (encoding === 'binary') {
-                    this._readableCallback = readBinaryData.bind(this);
-                } else {
-                    this._readableCallback = readStringData.bind(this);
-                }
-                readableStream.on('readable', this._readableCallback);
+                this._readableCallback = readStringData.bind(this);
             }
+            readableStream.on('readable', this._readableCallback);
         };
         util.inherits(DelimiterStream, events.EventEmitter);
 
