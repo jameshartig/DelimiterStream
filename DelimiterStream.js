@@ -62,14 +62,12 @@
             i = dataLen,
             trailingDataIndex = -1, //index of data after the last delimiter match in data
             lastMatchIndex = 0,
-            end = 0;
-        if (dataLimit > 0 && dataLen > dataLimit) {
-            end = dataLen - dataLimit;
-        }
+            matchLimit  = dataLimit || Infinity,
+            len = 0;
 
         //first start going back through data to find the last match
         //we do this loop separately so we can just store the index of the last match and then add that to the buffer at the end for the next packet
-        while (i-- > end) {
+        while (i--) {
             if (data[i] === stream.delimiter) {
                 //now that we found the match, store the index (+1 so we don't store the delimiter)
                 trailingDataIndex = i + 1;
@@ -79,6 +77,7 @@
 
         //if we didn't find a match at all, just push the data onto the buffer
         if (trailingDataIndex === -1) {
+            //don't use dataLimit here since we shouldn't pass in infinity to concatBuffer
             stream.buffer = concatBuffer(stream.buffer, data, dataLimit);
             return;
         }
@@ -86,7 +85,10 @@
         while (i--) {
             if (data[i] === stream.delimiter) {
                 //make sure we ignore back-to-back delimiters
-                if (i + 1 < lastMatchIndex) {
+                len = lastMatchIndex - (i + 1); //i + 1 so we don't include the delimiter we just matched
+                if (len > matchLimit) {
+                    stream.matches.push(data.slice(lastMatchIndex - matchLimit, lastMatchIndex));
+                } else if (len > 0) {
                     stream.matches.push(data.slice(i + 1, lastMatchIndex));
                 }
                 lastMatchIndex = i;
@@ -112,6 +114,7 @@
         //todo: optimize this to not make an empty buffer just to fill it with a new thing immediately after
         //make sure the lastMatchIndex isn't the end
         if (lastMatchIndex < dataLen) {
+            //don't use dataLimit here since we shouldn't pass in infinity to concatBuffer
             stream.buffer = concatBuffer(stream.buffer, data.slice(trailingDataIndex), dataLimit);
         }
 
