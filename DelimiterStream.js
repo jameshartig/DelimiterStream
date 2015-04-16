@@ -1,9 +1,34 @@
 (function(undefined) {
     var root = this,
         isNode = false,
-        DelimiterStream;
+        DelimiterStream, BUFFER_CONSTRUCTOR,
+        concatBuffer;
     if (typeof module !== 'undefined' && typeof Buffer !== 'undefined') {
         isNode = true;
+        BUFFER_CONSTRUCTOR = Buffer;
+        concatBuffer = require('buffer-concat-limit');
+    } else {
+        BUFFER_CONSTRUCTOR = Array;
+        concatBuffer = function(stringArr, newString, limitFromEnd) {
+            if (limitFromEnd > 0) {
+                var i = stringArr.length,
+                    newLen = newString.length;
+                if (newLen > limitFromEnd) {
+                    return [stringArr.substr(newLen - limitFromEnd, limitFromEnd)];
+                }
+                while (i-- && newLen < limitFromEnd) {
+                    newLen += stringArr[i].length;
+                    if (newLen > limitFromEnd) {
+                        stringArr[i] = stringArr[i].substr(limitFromEnd - newLen);
+                    }
+                }
+                if (i > 0) {
+                    stringArr.splice(0, i);
+                }
+            }
+            stringArr.push(newString);
+            return stringArr;
+        };
     }
 
     /**
@@ -32,24 +57,29 @@
     /**
      * Handle data from a string stream
      */
-    function handleData(stream, asString, data) {
+    function handleData(stream, asString, data, dataLimit) {
         var dataLen = data.length,
             i = dataLen,
-            sliceFuncName = asString ? 'substring' : 'slice',
-            trailingDataIndex, //index of data after the last delimiter match in data
-            lastMatchIndex;
+            trailingDataIndex = -1, //index of data after the last delimiter match in data
+            lastMatchIndex = 0,
+            end = 0;
+        if (dataLimit > 0 && dataLen > dataLimit) {
+            end = dataLen - dataLimit;
+        }
+
         //first start going back through data to find the last match
         //we do this loop separately so we can just store the index of the last match and then add that to the buffer at the end for the next packet
-        while (i--) {
+        while (i-- > end) {
             if (data[i] === stream.delimiter) {
                 //now that we found the match, store the index (+1 so we don't store the delimiter)
                 trailingDataIndex = i + 1;
                 break;
             }
         }
+
         //if we didn't find a match at all, just push the data onto the buffer
-        if (i === -1) {
-            stream.buffer.push(data);
+        if (trailingDataIndex === -1) {
+            stream.buffer = concatBuffer(stream.buffer, data, dataLimit);
             return;
         }
         lastMatchIndex = i;
@@ -57,26 +87,32 @@
             if (data[i] === stream.delimiter) {
                 //make sure we ignore back-to-back delimiters
                 if (i + 1 < lastMatchIndex) {
-                    stream.matches.push(data[sliceFuncName](i + 1, lastMatchIndex));
+                    stream.matches.push(data.slice(i + 1, lastMatchIndex));
                 }
                 lastMatchIndex = i;
             }
         }
         //since the loop stops at the beginning of data we need to store the bytes before the first match in the string
         if (lastMatchIndex > 0) {
-            stream.buffer.push(data[sliceFuncName](0, lastMatchIndex));
+            stream.buffer = concatBuffer(stream.buffer, data.slice(0, lastMatchIndex), dataLimit);
         }
         //add the leftover buffer to the matches at the end (beginning when we emit events)
         if (asString) {
-            stream.matches.push(stream.buffer.join(""));
+            if (isNode) {
+                stream.matches.push(stream.buffer.toString());
+                stream.buffer = new BUFFER_CONSTRUCTOR(0);
+            } else {
+                stream.matches.push(stream.buffer.splice(0, stream.buffer.length).join(''));
+            }
         } else {
-            stream.matches.push(Buffer.concat(stream.buffer));
+            stream.matches.push(stream.buffer);
+            stream.buffer = new BUFFER_CONSTRUCTOR(0);
         }
 
-        stream.buffer.length = 0;
+        //todo: optimize this to not make an empty buffer just to fill it with a new thing immediately after
         //make sure the lastMatchIndex isn't the end
         if (lastMatchIndex < dataLen) {
-            stream.buffer.push(data[sliceFuncName](trailingDataIndex));
+            stream.buffer = concatBuffer(stream.buffer, data.slice(trailingDataIndex), dataLimit);
         }
 
         if (stream.emitEvents) {
@@ -98,7 +134,7 @@
             if (!data) {
                 return;
             }
-            handleData(this, true, data);
+            handleData(this, true, data, 0);
         };
 
         /**
@@ -109,7 +145,7 @@
             if (!data) {
                 return;
             }
-            handleData(this, false, data);
+            handleData(this, false, data, 0);
         };
 
         /**
@@ -151,7 +187,7 @@
             this.readableStream = readableStream;
             this.emitEvents = false;
             this.matches = [];
-            this.buffer = initialBuffer || [];
+            this.buffer = new BUFFER_CONSTRUCTOR(0);
             this.destroyed = false;
 
             this._closeCallback = this.onStreamClose.bind(this);
@@ -309,8 +345,15 @@
         this.args = args;
         this.emitEvents = true;
         this.delimiter = opts.delimiter || "\n";
+        if (typeof this.delimiter !== 'number' && typeof this.delimiter !== 'string') {
+            throw new TypeError('delimiter must be a number/string');
+        }
+        this.dataLimit = opts.dataLimit || 0;
+        if (typeof this.dataLimit !== 'number') {
+            throw new TypeError('dataLimit must be a number');
+        }
         this.matches = [];
-        this.buffer = [];
+        this.buffer = new BUFFER_CONSTRUCTOR(0);
         this._isKnownType = false;
         this._isString = true;
     }
@@ -341,11 +384,10 @@
         if (!data) {
             if (data === null) {
                 this.flushData();
-                return;
             }
             return;
         }
-        handleData(this, this._isString, data);
+        handleData(this, this._isString, data, this.dataLimit);
     };
     WrapStream.prototype.flushData = function() {
         if (this._isKnownType === false || this.buffer.length === 0) {
@@ -354,11 +396,16 @@
         var lastMatch;
         //add the leftover buffer to the matches at the end (beginning when we emit events)
         if (this._isString) {
-            lastMatch = this.buffer.join("");
+            if (isNode) {
+                lastMatch = this.buffer.toString();
+            } else {
+                lastMatch = this.buffer.join("");
+            }
         } else {
-            lastMatch = Buffer.concat(this.buffer);
+            lastMatch = this.buffer;
         }
         if (lastMatch.length > 0) {
+            this.buffer = new BUFFER_CONSTRUCTOR(0);
             this.matches.push(lastMatch);
             emitEvents(this);
         }
@@ -375,13 +422,23 @@
             callback = opts;
             callbackContext = fn;
             argsSkip = 2;
+        } else if (!opts) {
+            throw new TypeError('Invalid function/options sent to DelimiterStream.wrap');
         }
         //put an undefined at the end so we leave space for data
         args = arguments.length > argsSkip ? Array.prototype.slice.call(arguments, argsSkip).concat([undefined]) : null;
         stream = new WrapStream(options, callback, callbackContext, args);
-        return function(data) {
-            stream.handleData(data);
-        }
+        return function(err, data) {
+            if (arguments.length > 1) {
+                stream.handleData(data);
+            } else {
+                if (err instanceof Error) {
+                    stream.handleData(null);
+                } else {
+                    stream.handleData(err);
+                }
+            }
+        };
     };
 
     if (isNode) {

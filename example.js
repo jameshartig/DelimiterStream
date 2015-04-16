@@ -1,10 +1,15 @@
-var fs = require("fs"),
-    DelimiterStream = require("./DelimiterStream"),
-    fdStream = new fs.ReadStream(null, {fd: 0});
+var fs = require('fs'),
+    DelimiterStream = require('./DelimiterStream.js');
+fs.readFile('./example.csv', DelimiterStream.wrap(function(line) {
+    console.log(line.toString());
+}));
 
-fdStream.setEncoding('utf8');
-var d = new DelimiterStream(fdStream, "\n", "utf8");
-d.on('data', function(data) {
-    console.log("Received:", data);
+var net = require('net'),
+    server = net.createServer();
+function onSocketLine(line) {
+    console.log('Received line from', this.remoteAddress, line);
+}
+server.on('connection', function(socket) {
+    socket.on('data', DelimiterStream.wrap(onSocketLine, socket));
 });
-d.resume();
+server.listen(3000);

@@ -539,3 +539,48 @@ exports.wrapFlush = function(test) {
     f.on('data', wrap);
     f.begin();
 };
+
+exports.wrapBinaryLimit = function(test) {
+    var gotData = false,
+        f = new DataEmitter(null, 1000, 101);
+    f.write(10, 500); //"\n"
+    f.on('done', function() {
+        test.ok(gotData);
+        test.done();
+    });
+    f.on('data', DelimiterStream.wrap({dataLimit: 100}, function(data) {
+        test.equal(data.length, 100);
+        gotData = true;
+    }));
+    f.begin();
+};
+
+exports.wrapBinaryLimitSmallChunks = function(test) {
+    var gotData = false,
+        f = new DataEmitter(null, 1000, 50);
+    f.write(10, 500); //"\n"
+    f.on('done', function() {
+        test.ok(gotData);
+        test.done();
+    });
+    f.on('data', DelimiterStream.wrap({dataLimit: 100}, function(data) {
+        test.equal(data.length, 100);
+        gotData = true;
+    }));
+    f.begin();
+};
+
+exports.wrapBinaryLimitAtEnd = function(test) {
+    var gotData = false,
+        f = new DataEmitter(null, 1000, 500);
+    f.write(10, 499); //"\n"
+    f.on('done', function() {
+        test.ok(gotData);
+        test.done();
+    });
+    f.on('data', DelimiterStream.wrap({dataLimit: 100}, function(data) {
+        test.equal(data.length, 100);
+        gotData = true;
+    }));
+    f.begin();
+};
