@@ -584,3 +584,19 @@ exports.wrapBinaryLimitAtEnd = function(test) {
     }));
     f.begin();
 };
+
+exports.wrapBinaryLimitTwice = function(test) {
+    var dataCount = 0,
+        f = new DataEmitter(null, 1000, 500);
+    f.write(10, 199); //"\n"
+    f.write(10, 399); //"\n"
+    f.on('done', function() {
+        test.equal(dataCount, 2);
+        test.done();
+    });
+    f.on('data', DelimiterStream.wrap({dataLimit: 100}, function(data) {
+        test.equal(data.length, 100);
+        dataCount++;
+    }));
+    f.begin();
+};
