@@ -1,10 +1,23 @@
-DelimiterStream
-===============
+# DelimiterStream #
 
 Get delimiter-separated (e.g. new line) chunks of data from a Readable Stream, Websocket or other
 data source.
 
-### Usage
+## Methods ##
+
+### DelimiterStream.wrap(options, callback [, context, args...])
+### DelimiterStream.wrap(callback [, context, args...])
+Returns a function that calls `callback` with a chunk of data as they are received. If `options`
+are passed then you can customize the `delimiter` and `dataLimit`. Delimiter defaults to `\n`.
+
+The chunks will **NOT include the delimiter**.
+
+## Coming from v0.2.x? ##
+
+v0.3.x is 100% backwards compatible with [v0.2.x methods](https://github.com/fastest963/DelimiterStream/blob/0.2.8/README.md),
+but they are deprecated. They will be removed in v0.4.x.
+
+## Example ##
 Primary use case is with a server endpoint that accepts new-line-delimited data:
 ```
 var net = require('net'),
@@ -29,15 +42,5 @@ fs.readFile('example.csv', DelimiterStream.wrap(function(line) {
     console.log(line.toString());
 });
 ```
-
-Methods
--------
-
-### DelimiterStream.wrap(options, callback [, context, args...])
-### DelimiterStream.wrap(callback [, context, args...])
-Returns a function that calls `callback` with a chunk of data as they are received. If `options`
-are passed then you can customize the `delimiter` and `dataLimit`. Delimiter defaults to `\n`.
-
-The chunks will **NOT include the delimiter**.
 
 By [James Hartig](https://github.com/fastest963/)
