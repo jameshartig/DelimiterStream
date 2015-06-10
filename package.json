@@ -1,6 +1,6 @@
 {
   "name": "delimiterstream",
-  "version": "0.3.0-beta.0",
+  "version": "0.3.0",
   "description": "Get delimiter-separated chunks of data from a Readable Stream.",
   "main": "DelimiterStream.js",
   "directories": {
